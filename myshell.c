@@ -10,7 +10,7 @@
 
 int main(int argc, char const *argv[]) {
 	while(1){
-		printf("ufs> ");
+		printf("user@my_shell> ");
 		char cmd[CLEN];
 		fgets(cmd, CLEN, stdin);
 		strtok(cmd, "\n");
