@@ -9,6 +9,12 @@
 // maximum characters in a command
 #define CLEN 50
 
+// maximum tokens in a command
+#define CTOKS 100
+
+// debug-mode indicator
+bool debug-mode;
+
 void tokenize_string(char *cmd, char **tokens){
 
 	char *str2, *subtoken;
@@ -41,9 +47,10 @@ int main(int argc, char const *argv[]) {
 		strtok(cmd, "\n");
 
 		if(strcmp(cmd, "exit") == 0){
+
 			return 0;
-		}
-		else{
+
+		}else{
 
 			int pid = fork();
 			
@@ -56,7 +63,7 @@ int main(int argc, char const *argv[]) {
 					// printf("child process: %d\n", getpid());
 
 					// tokenize cmd into command and options
-					char **args = (char **)malloc(100*sizeof(char *));
+					char **args = (char **)malloc(CTOKS*sizeof(char *));
 					tokenize_string(cmd, args);
 					
 					// execute command with options
@@ -72,11 +79,15 @@ int main(int argc, char const *argv[]) {
 					perror("status code");
 
 				}
-			}
-			else{
+
+			}else{
+
 				perror("fork");
+
 			}
 		}
 	}
+
 	return 0;
+
 }
