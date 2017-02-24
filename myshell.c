@@ -6,42 +6,71 @@
 #include <string.h>
 #include <errno.h>
 
-#define CLEN 50 // max command length
+// maximum characters in a command
+#define CLEN 50
+
+void tokenize_string(char *cmd, char **tokens){
+
+	char *str2, *subtoken;
+	int j;
+
+	// strtok implementation from man page
+	for (j = 0, str2 = cmd; ; str2 = NULL) {
+
+		subtoken = strtok(str2, " ");
+		if(subtoken == NULL){
+			break;
+		}
+		tokens[j] = malloc(50*sizeof(char));
+		strcpy(tokens[j++], subtoken);
+		// printf("**--> %s\n", subtoken);
+
+	}
+}
 
 int main(int argc, char const *argv[]) {
+
 	while(1){
+
 		printf("user@my_shell> ");
+		
+		// command string
 		char cmd[CLEN];
 		fgets(cmd, CLEN, stdin);
+		// remove newline character
 		strtok(cmd, "\n");
 
 		if(strcmp(cmd, "exit") == 0){
 			return 0;
 		}
 		else{
+
 			int pid = fork();
+			
+			// fork successful
 			if(pid >= 0){
+
+				// inside child process
 				if(pid == 0){
+
 					// printf("child process: %d\n", getpid());
+
+					// tokenize cmd into command and options
 					char **args = (char **)malloc(100*sizeof(char *));
-					char *str2, *subtoken;
-					int j;
-					for (j = 0, str2 = cmd; ; str2 = NULL) {
-						subtoken = strtok(str2, " ");
-						if(subtoken == NULL){
-							break;
-						}
-						args[j] = malloc(50*sizeof(char));
-						strcpy(args[j++],subtoken);
-						// printf("**--> %s\n", subtoken);
-					}
+					tokenize_string(cmd, args);
 					
+					// execute command with options
 					return execvp(args[0], args);
+
 				}
+
+				// inside parent process
 				else{
+
 					int status;
 					wait(&status);
 					perror("status code");
+
 				}
 			}
 			else{
