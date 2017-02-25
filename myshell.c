@@ -12,8 +12,11 @@
 // maximum tokens in a command
 #define CTOKS 100
 
+// maximum characters in a path
+#define PLEN 100
+
 // debug-mode indicator
-bool debug-mode;
+int debug_mode;
 
 void tokenize_string(char *cmd, char **tokens){
 
@@ -34,11 +37,27 @@ void tokenize_string(char *cmd, char **tokens){
 	}
 }
 
+// returns the absolute path of current working directory
+char* pres_working_dir(){
+
+	char *pwd = (char *)malloc(sizeof(char)*PLEN);
+	getcwd(pwd, sizeof(char)*PLEN);
+	return pwd;
+
+}
+
+// prints prefix string for my_shell
+void print_prefix(){
+
+	printf("user@myshell:%s$ ", pres_working_dir());
+
+}
+
 int main(int argc, char const *argv[]) {
 
 	while(1){
 
-		printf("user@my_shell> ");
+		print_prefix();
 		
 		// command string
 		char cmd[CLEN];
@@ -67,7 +86,10 @@ int main(int argc, char const *argv[]) {
 					tokenize_string(cmd, args);
 					
 					// execute command with options
-					return execvp(args[0], args);
+					execvp(args[0], args);
+
+					// exit with status code of execvp() call
+					exit(errno);
 
 				}
 
@@ -75,8 +97,8 @@ int main(int argc, char const *argv[]) {
 				else{
 
 					int status;
+					// receives status code from child process here
 					wait(&status);
-					perror("status code");
 
 				}
 
