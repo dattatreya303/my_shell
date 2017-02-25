@@ -18,8 +18,10 @@
 // debug-mode indicator
 int debug_mode;
 
-void tokenize_string(char *cmd, char **tokens){
+// returns the tokens as a double pointer, cmd becomes null
+char** tokenize_string(char *cmd){
 
+	char **tokens = (char **)malloc(CTOKS*sizeof(char *));
 	char *str2, *subtoken;
 	int j;
 
@@ -32,9 +34,11 @@ void tokenize_string(char *cmd, char **tokens){
 		}
 		tokens[j] = malloc(50*sizeof(char));
 		strcpy(tokens[j++], subtoken);
-		// printf("**--> %s\n", subtoken);
+		// printf("%s %s\n", str2, subtoken);
 
 	}
+
+	return tokens;
 }
 
 // returns the absolute path of current working directory
@@ -53,6 +57,42 @@ void print_prefix(){
 
 }
 
+void change_dir(char *to_path){
+
+	int status = chdir(to_path);
+
+	// chdir() call fails
+	if( status == -1 ){
+
+		printf("No file or directory: %s\n", to_path);
+
+	}
+
+}
+
+// checks if string full has the given prefix
+int startswith(char* full, char* prefix){
+
+	int i;
+	for(i=0; prefix[i] != '\0' && full[i] != '\0'; i++){
+
+		if( prefix[i] != full[i] ){
+
+			return 0;
+
+		}
+
+	}
+
+	if( prefix[i] != '\0' ){
+
+		return 0;
+
+	}
+
+	return 1;
+}
+
 int main(int argc, char const *argv[]) {
 
 	while(1){
@@ -69,7 +109,22 @@ int main(int argc, char const *argv[]) {
 
 			return 0;
 
-		}else{
+		}
+
+		else if( startswith(cmd, "cd") ){
+
+			// extract path string from input
+			char **args = tokenize_string(cmd);
+
+			if( args[1] != NULL ){
+
+				change_dir(args[1]);
+
+			}
+
+		}
+
+		else{
 
 			int pid = fork();
 			
@@ -82,8 +137,7 @@ int main(int argc, char const *argv[]) {
 					// printf("child process: %d\n", getpid());
 
 					// tokenize cmd into command and options
-					char **args = (char **)malloc(CTOKS*sizeof(char *));
-					tokenize_string(cmd, args);
+					char **args = tokenize_string(cmd);
 					
 					// execute command with options
 					execvp(args[0], args);
@@ -102,12 +156,16 @@ int main(int argc, char const *argv[]) {
 
 				}
 
-			}else{
+			}
+
+			else{
 
 				perror("fork");
 
 			}
+
 		}
+
 	}
 
 	return 0;
