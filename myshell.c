@@ -6,6 +6,7 @@
 #include <string.h>
 #include <errno.h>
 
+// name of file keeping record of user commands issued
 #define HIST_FILE ".history"
 
 // maximum characters in a path
@@ -114,6 +115,7 @@ void print_cmd_history(){
 void clear_cmd_history(){
 
 	FILE *fp = fopen( HIST_FILE, "w" );
+	fputs( "\n", fp );
 	fclose(fp);
 
 }
@@ -142,10 +144,12 @@ int main( int argc, char const *argv[] ){
 		append_cmd_history(cmd);
 
 		/*
+
 			* Now we execute the user command, throw an error if its invalid.
 			* If the user issues a system command, then we use execvp().
 			* Else, it is implemented in the code itself.
 			* Supported shell commands: exit, cd, history(basic)
+
 		*/
 
 		if( strcmp( cmd, "exit" ) == 0 ){
@@ -167,9 +171,23 @@ int main( int argc, char const *argv[] ){
 
 		}
 
-		else if ( strcmp(cmd, "history") == 0 ){
+		// history: prints the etire history of commands issued by user
+		// history -c: prints and clears history
+		else if ( startswith( cmd, "history" ) ){
 
-			print_cmd_history();
+			char **args = tokenize_string(cmd);
+
+			if( args[1] == NULL ){
+
+				print_cmd_history();
+
+			}
+
+			else if ( strcmp( args[1], "-c" ) == 0 ){
+
+				clear_cmd_history();
+
+			}
 
 		}
 
