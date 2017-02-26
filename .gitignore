@@ -4,3 +4,6 @@
 
 # HISTORY FILE
 /.history
+
+# Test files
+/*.py

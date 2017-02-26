@@ -1,3 +1,16 @@
+/*
+	* TODO:-
+	* Handle CTRL-C
+	* Handle invalid commands
+	* Implement piping
+	* Implement redirection operators
+*/
+
+/*
+	* Name: Dattatreya Mohapatra
+	* Roll No.: 2015021
+*/
+
 #include <unistd.h>
 #include <sys/wait.h>
 #include <sys/types.h>
@@ -19,7 +32,14 @@
 #define CTOKS 100
 
 // debug-mode indicator
-int debug_mode;
+int DEBUG_MODE;
+
+// return key pressed
+int RET_SIG;
+
+// CTRL-C signal sent
+int CTRL_C_SIG;
+
 
 // returns the tokens as a double pointer, cmd becomes null
 char** tokenize_string( char *cmd ){
@@ -115,7 +135,7 @@ void print_cmd_history(){
 void clear_cmd_history(){
 
 	FILE *fp = fopen( HIST_FILE, "w" );
-	fputs( "\n", fp );
+	fputs( "", fp );
 	fclose(fp);
 
 }
@@ -130,6 +150,9 @@ void append_cmd_history(char* cmd){
 
 int main( int argc, char const *argv[] ){
 
+	RET_SIG = 0;
+	CTRL_C_SIG = 0;
+
 	while(1){
 
 		print_prefix();
@@ -140,100 +163,113 @@ int main( int argc, char const *argv[] ){
 		// remove newline character
 		strtok( cmd, "\n" );
 
-		// append command to history file
-		append_cmd_history(cmd);
+		// handle RETURN signal
+		if( cmd[0] == '\n' ){
 
-		/*
-
-			* Now we execute the user command, throw an error if its invalid.
-			* If the user issues a system command, then we use execvp().
-			* Else, it is implemented in the code itself.
-			* Supported shell commands: exit, cd, history(basic)
-
-		*/
-
-		if( strcmp( cmd, "exit" ) == 0 ){
-
-			return 0;
+			RET_SIG = 1;
 
 		}
+		
+		if( !RET_SIG ){
 
-		else if( startswith( cmd, "cd" ) ){
-
-			// extract path string from input
-			char **args = tokenize_string(cmd);
-
-			if( args[1] != NULL ){
-
-				change_dir(args[1]);
-
-			}
-
-		}
-
-		// history: prints the etire history of commands issued by user
-		// history -c: prints and clears history
-		else if ( startswith( cmd, "history" ) ){
-
-			char **args = tokenize_string(cmd);
-
-			if( args[1] == NULL ){
-
-				print_cmd_history();
-
-			}
-
-			else if ( strcmp( args[1], "-c" ) == 0 ){
-
-				clear_cmd_history();
-
-			}
-
-		}
-
-		else{
-
-			int pid = fork();
+			// append command to history file
+			append_cmd_history(cmd);
 			
-			// fork successful
-			if( pid >= 0 ){
 
-				// inside child process
-				if( pid == 0 ){
+			/*
 
-					// printf("child process: %d\n", getpid());
+				* Now we execute the user command, or throw an error if it is invalid.
+				* If the user issues a system command, then we use execvp().
+				* Else, it is implemented in the code itself.
+				* Supported shell commands: exit, cd, history(basic)
 
-					// tokenize cmd into command and options
-					char **args = tokenize_string(cmd);
-					
-					// execute command with options
-					execvp( args[0], args );
+			*/
 
-					// exit with status code of execvp() call
-					exit(errno);
+			// exit form myshell
+			if( strcmp( cmd, "exit" ) == 0 ){
 
-				}
-
-				// inside parent process
-				else{
-
-					int status;
-					// receives status code from child process here
-					wait(&status);
-
-				}
+				return 0;
 
 			}
+
+			else if( startswith( cmd, "cd" ) ){
+
+				// extract path string from input
+				char **args = tokenize_string(cmd);
+
+				if( args[1] != NULL ){
+
+					change_dir(args[1]);
+
+				}
+
+			} // 'cd' handler
+
+			// history: prints the etire history of commands issued by user
+			// history -c: prints and clears history
+			else if ( startswith( cmd, "history" ) ){
+
+				char **args = tokenize_string(cmd);
+
+				if( args[1] == NULL ){
+
+					print_cmd_history();
+
+				}	
+
+				else if ( strcmp( args[1], "-c" ) == 0 ){
+
+					clear_cmd_history();
+
+				}
+
+			} // 'history' handler
 
 			else{
 
-				perror("fork");
+				int pid = fork();
+				
+				// fork successful
+				if( pid >= 0 ){
 
-			}
+					// inside child process
+					if( pid == 0 ){
 
-		}
+						// printf("child process: %d\n", getpid());
 
-	}
+						// tokenize cmd into command and options
+						char **args = tokenize_string(cmd);
+						
+						// execute command with options
+						return execvp( args[0], args );
+
+					}
+
+					// inside parent process
+					else{
+
+						int status;
+						// receives status code from child process here
+						wait(&status);
+
+					}
+
+				}
+
+				else{
+
+					perror("fork");
+
+				}
+
+			} // system command handler
+
+		} // if ( !RET_SIG )
+
+		RET_SIG = 0;
+		CTRL_C_SIG = 0;
+
+	} // while-loop ends
 
 	return 0;
 
