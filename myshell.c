@@ -1,5 +1,9 @@
 /*
 	* TODO:-
+	* Implement 'cd'				DONE
+	* Implement 'history'			DONE
+	* Implement 'clear'
+	* Handle erroneous commands		DONE
 	* Handle CTRL-C
 	* Handle invalid commands
 	* Implement piping
@@ -249,8 +253,16 @@ int main( int argc, char const *argv[] ){
 					else{
 
 						int status;
+						
 						// receives status code from child process here
 						wait(&status);
+
+						// Handle erroreous command
+						if( status == 65280 ){
+							
+							printf("%s: command not found\n", cmd);
+
+						}
 
 					}
 
