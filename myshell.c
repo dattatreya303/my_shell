@@ -1,7 +1,7 @@
 /*
 	* TODO:-
 	* Implement 'cd'				DONE
-	* Implement 'history'			DONE (have to place .history in HOME)
+	* Implement 'history'			DONE
 	* Implement 'clear'				DONE
 	* Handle erroneous commands		DONE
 	* Implement 'kill'
