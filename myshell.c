@@ -7,9 +7,9 @@
 	* Implement 'pwd'				DONE
 	* Handle erroneous commands		DONE
 	* Implement redirection 		DONE (only one operator, only system commands supported)
-	* Implement piping 				DONE (only one pipe, only system commands supported)
+	* Implement piping 				DONE (only system commands supported)
 	* Handle CTRL-C signal 			DONE
-	* Handle RETURN signal			PARTIAL
+	* Handle RETURN signal			DONE
 
 	NB: Piping and redirection operators are handled separately, as of now. So, using them together is not supported.
 */
@@ -51,7 +51,6 @@ int RET_SIG;
 
 // Returns the arrray of tokens (separated by 'symbol') as a double pointer
 char** tokenize_string( char *cmd, char *symbol ){
-
 	char **tokens = ( char ** )malloc( CTOKS*sizeof(char*) );
 	char *str2, *subtoken;
 	int j;
@@ -347,6 +346,120 @@ int exec_with_piping( char **commands ){
 	return flag;
 }
 
+int exec_with_piping_mult( char **commands ){
+
+	int noComs;
+	for( noComs = 0; commands[noComs] != NULL; noComs++ );
+
+	int pipe_fds[CTOKS][2];
+	int i;
+	for( i = 0; i < noComs - 1; i++ ){
+
+		int pipe_fl = pipe(pipe_fds[i]);
+		if( pipe_fl == -1 ){
+
+			printf("Failed to create pipes!\n");
+			return -1;
+
+		}
+
+	}
+
+	for( i = 0; i < noComs; i++ ){
+
+		int pid_1 = fork();
+		if( pid_1 >= 0){
+
+			if( pid_1 == 0 ){
+
+				// Inside child process
+				
+				if( i == 0){
+
+					if( dup2( pipe_fds[i][1], STDOUT_FILENO ) == -1 ){
+
+						printf("Failed to duplicate file descriptors\n");
+						return -1;
+
+					}
+
+				}
+
+				else if ( i == noComs - 1 ){
+
+					if( dup2( pipe_fds[i-1][0], STDIN_FILENO ) == -1 ){
+
+						printf("Failed to duplicate file descriptors\n");
+						return -1;
+
+					}
+
+				}
+
+				else{
+
+					if( dup2( pipe_fds[i][1], STDOUT_FILENO ) == -1 || dup2( pipe_fds[i-1][0], STDIN_FILENO ) == -1 ){
+
+						printf("Failed to duplicate file descriptors\n");
+						return -1;
+
+					}
+
+				}
+
+				int j;
+				for( j = 0; j < noComs - 1; j++ ){
+
+					close(pipe_fds[j][0]);
+					close(pipe_fds[j][1]);
+					
+				}
+
+				// Tokenize commands[1] into command and options
+				char **args = tokenize_string( commands[i], " " );
+
+				// Execute command with options
+				return execvp( args[0], args );
+
+			}
+		}
+
+		else{
+
+			printf("Failed to fork()!\n");
+			return -1;
+
+		}
+		
+	}
+
+
+	//  Close pipes as parent process does not need them anymore
+	int j;
+	for( j = 0; j < noComs - 1; j++ ){
+
+		close(pipe_fds[j][0]);
+		close(pipe_fds[j][1]);
+		
+	}
+
+	// wait for all the children to terminate
+	int flag = 0;
+	int status;
+	while( wait(&status) > 0 ){
+
+		// Handle erroneous command
+		if( status == 65280 ){
+			
+			flag = -1;
+
+		}
+
+	}
+
+	return flag;
+}
+
 void print_cmd_history(){
 
 	FILE *fp = fopen( HIST_FILE, "r" );
@@ -506,7 +619,7 @@ int main( int argc, char const *argv[] ){
 					// printf("%s %s\n", commands[0], commands[1]);
 					
 					// Handle commands in array with separate forks. 
-					int st = exec_with_piping(commands);
+					int st = exec_with_piping_mult(commands);
 
 					if( st < 0 ){
 
