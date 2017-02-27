@@ -4,8 +4,8 @@
 	* Implement 'history'			DONE
 	* Implement 'clear'				DONE
 	* Handle erroneous commands		DONE
-	* Implement 'kill'
-	* Handle RETURN signal
+	* Implement 'kill'				DONE
+	* Handle RETURN signal			PARTIAL
 	* Handle CTRL-C signal
 	* Implement piping
 	* Implement redirection operators
