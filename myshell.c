@@ -3,12 +3,13 @@
 	* Implement 'cd'				DONE
 	* Implement 'history'			DONE
 	* Implement 'clear'				DONE
-	* Handle erroneous commands		DONE
 	* Implement 'kill'				DONE
+	* Implement 'pwd'				DONE
+	* Handle erroneous commands		DONE
 	* Implement redirection 		DONE (only one operator, only system commands supported)
 	* Implement piping 				DONE (only one pipe, only system commands supported)
+	* Handle CTRL-C signal 			DONE
 	* Handle RETURN signal			PARTIAL
-	* Handle CTRL-C signal
 
 	NB: Piping and redirection operators are handled separately, as of now. So, using them together is not supported.
 */
@@ -23,6 +24,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -45,9 +47,6 @@ int DEBUG_MODE;
 
 // Return key pressed
 int RET_SIG;
-
-// CTRL-C signal sent
-int CTRL_C_SIG;
 
 
 // Returns the arrray of tokens (separated by 'symbol') as a double pointer
@@ -96,6 +95,10 @@ int startswith( char* full, char* prefix ){
 	return 1;
 }
 
+/*
+	* Strips the string of the 'symbol' at the both ends
+	* Works like strip() in python
+*/
 char* strip_string(char *string, char symbol){
 
 	int i;
@@ -366,10 +369,26 @@ void append_cmd_history( char* cmd ){
 
 }
 
+/*
+	* SIGINT signal handler
+	* Ignore when CTRL-C is pressed
+	* Child process is terminated, but my_shell is not affected
+*/
+void SIGINT_handler( int signum ){
+
+	// print_prefix();
+
+	return ;
+
+}
+
 int main( int argc, char const *argv[] ){
 
+	// Register SIGINT handler to ignore CTRL-C
+	signal( SIGINT, SIGINT_handler );
+
+	// RETURN signal indicator
 	RET_SIG = 0;
-	CTRL_C_SIG = 0;
 
 	while(1){
 
@@ -540,7 +559,6 @@ int main( int argc, char const *argv[] ){
 		} // if ( !RET_SIG )
 
 		RET_SIG = 0;
-		CTRL_C_SIG = 0;
 
 	} // while-loop ends
 
