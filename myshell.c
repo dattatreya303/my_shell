@@ -1,11 +1,12 @@
 /*
 	* TODO:-
 	* Implement 'cd'				DONE
-	* Implement 'history'			DONE
-	* Implement 'clear'
+	* Implement 'history'			DONE (have to place .history in HOME)
+	* Implement 'clear'				DONE
 	* Handle erroneous commands		DONE
-	* Handle CTRL-C
-	* Handle invalid commands
+	* Implement 'kill'
+	* Handle RETURN signal
+	* Handle CTRL-C signal
 	* Implement piping
 	* Implement redirection operators
 */
@@ -18,34 +19,36 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
 
-// name of file keeping record of user commands issued
-#define HIST_FILE ".history"
+// Name of file keeping record of user commands issued
+#define HIST_FILE "/home/dattatreya/.history"
 
-// maximum characters in a path
+// Maximum characters in a path
 #define PLEN 100
 
-// maximum characters in a command
+// Maximum characters in a command
 #define CLEN 50
 
-// maximum tokens in a command
+// Maximum tokens in a command
 #define CTOKS 100
 
-// debug-mode indicator
+// Debug mode indicator
 int DEBUG_MODE;
 
-// return key pressed
+// Return key pressed
 int RET_SIG;
 
 // CTRL-C signal sent
 int CTRL_C_SIG;
 
 
-// returns the tokens as a double pointer, cmd becomes null
+// Returns the tokens as a double pointer
 char** tokenize_string( char *cmd ){
 
 	char **tokens = ( char ** )malloc( CTOKS*sizeof(char*) );
@@ -68,36 +71,7 @@ char** tokenize_string( char *cmd ){
 	return tokens;
 }
 
-// returns the absolute path of current working directory
-char* pres_working_dir(){
-
-	char *pwd = ( char * )malloc( sizeof(char)*PLEN );
-	getcwd( pwd, sizeof(char)*PLEN );
-	return pwd;
-
-}
-
-// prints prefix string for my_shell
-void print_prefix(){
-
-	printf( "user@myshell:%s$ ", pres_working_dir() );
-
-}
-
-void change_dir( char *to_path ){
-
-	int status = chdir( to_path );
-
-	// chdir() call fails
-	if( status == -1 ){
-
-		printf( "No file or directory: %s\n", to_path );
-
-	}
-
-}
-
-// checks if string full has the given prefix
+// Checks if string 'full' has the given prefix
 int startswith( char* full, char* prefix ){
 
 	int i;
@@ -118,6 +92,114 @@ int startswith( char* full, char* prefix ){
 	}
 
 	return 1;
+}
+
+char* strip_string(char *string, char symbol){
+
+	int i;
+	while( string[0] == symbol ){
+
+		string = string + 1;
+
+	}
+
+	while( string[ (int)(strlen(string)) - 1 ] == symbol ){
+
+		string[ (int)(strlen(string)) - 1 ] = '\0';
+
+	}
+
+	return string;
+
+}
+
+// Returns the absolute path of current working directory
+char* pres_working_dir(){
+
+	char *pwd = ( char * )malloc( sizeof(char)*PLEN );
+	getcwd( pwd, sizeof(char)*PLEN );
+	return pwd;
+
+}
+
+// Prints prefix string for my_shell
+void print_prefix(){
+
+	printf( "user@myshell:%s$ ", pres_working_dir() );
+
+
+}
+
+void change_dir( char *to_path ){
+
+	int status = chdir( to_path );
+
+	// chdir() call fails
+	if( status == -1 ){
+
+		printf( "No file or directory: %s\n", to_path );
+
+	}
+
+}
+
+/*
+	* Checks if '>' or '<' or '|' exits in the command string
+	* 0 - no redir
+	* 1 - '>' (output redirection)
+	* 2 - '<' (input redirection)
+	* 3 - '|' (piping)
+	* Stores position of operator in index
+*/
+int check_redir( char *cmd, int *index ){
+
+	int i, op = 0;
+	for( i = 0; cmd[i] != '\0'; i++ ){
+
+		*index = i;
+
+		switch(cmd[i]){
+			case '>':	return 1;
+			case '<':	return 2;
+			case '|':	return 3;
+		}
+
+	}
+
+	return 0;
+
+}
+
+void prep_redirection( int redir_mode, int index, char *cmd ){
+
+	switch(redir_mode){
+		
+		case 1:{
+
+			char *filepath = cmd + index + 1;
+			filepath = strip_string( filepath, ' ' );
+			int fd_out = open( filepath, O_WRONLY|O_CREAT|O_TRUNC, S_IRUSR|S_IWUSR );
+			dup2( fd_out, STDOUT_FILENO );
+			cmd[index] = '\0';
+			cmd = strip_string( cmd, ' ' );
+			break;
+
+		}
+
+		case 2:{
+
+			char *filepath = cmd + index + 1;
+			filepath = strip_string( filepath, ' ' );
+			int fd_in = open( filepath, O_RDONLY );
+			dup2( fd_in, STDIN_FILENO );
+			cmd[index] = '\0';
+			cmd = strip_string( cmd, ' ' );
+			break;
+
+		}
+
+	}
+
 }
 
 void print_cmd_history(){
@@ -161,13 +243,13 @@ int main( int argc, char const *argv[] ){
 
 		print_prefix();
 		
-		// command string
+		// Command string
 		char cmd[CLEN];
 		fgets( cmd, CLEN, stdin );
-		// remove newline character
+		// Remove newline character
 		strtok( cmd, "\n" );
 
-		// handle RETURN signal
+		// Handle RETURN signal
 		if( cmd[0] == '\n' ){
 
 			RET_SIG = 1;
@@ -176,7 +258,7 @@ int main( int argc, char const *argv[] ){
 		
 		if( !RET_SIG ){
 
-			// append command to history file
+			// Append command to history file
 			append_cmd_history(cmd);
 			
 
@@ -189,7 +271,7 @@ int main( int argc, char const *argv[] ){
 
 			*/
 
-			// exit form myshell
+			// Exit form myshell
 			if( strcmp( cmd, "exit" ) == 0 ){
 
 				return 0;
@@ -198,7 +280,7 @@ int main( int argc, char const *argv[] ){
 
 			else if( startswith( cmd, "cd" ) ){
 
-				// extract path string from input
+				// Extract path string from input
 				char **args = tokenize_string(cmd);
 
 				if( args[1] != NULL ){
@@ -209,8 +291,10 @@ int main( int argc, char const *argv[] ){
 
 			} // 'cd' handler
 
-			// history: prints the etire history of commands issued by user
-			// history -c: prints and clears history
+			/*
+				* history: Prints the etire history of commands issued by user
+				* history -c: Prints and clears history
+			*/
 			else if ( startswith( cmd, "history" ) ){
 
 				char **args = tokenize_string(cmd);
@@ -233,28 +317,38 @@ int main( int argc, char const *argv[] ){
 
 				int pid = fork();
 				
-				// fork successful
+				// fork() successful
 				if( pid >= 0 ){
 
-					// inside child process
+					// Inside child process
 					if( pid == 0 ){
 
 						// printf("child process: %d\n", getpid());
 
-						// tokenize cmd into command and options
+						// Check for redirection operators (<, >, |)
+						int index = -1;
+						int redir_mode = check_redir(cmd, &index);
+
+						if( redir_mode == 1 || redir_mode == 2 ){
+
+							prep_redirection( redir_mode, index, cmd);
+
+						}
+
+						// Tokenize cmd into command and options
 						char **args = tokenize_string(cmd);
-						
-						// execute command with options
+						// printf("lalalala\n");
+						// Execute command with options
 						return execvp( args[0], args );
 
 					}
 
-					// inside parent process
+					// Inside parent process
 					else{
 
 						int status;
 						
-						// receives status code from child process here
+						// Receives status code from child process here
 						wait(&status);
 
 						// Handle erroreous command
