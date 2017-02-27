@@ -118,6 +118,16 @@ char* strip_string(char *string, char symbol){
 
 }
 
+// Displays information regarding all the in-built functions in my_shell
+void display_help(){
+
+	printf("my_shell, author: Dattatreya Mohapatra\n");
+	printf("The following commands are implemented internally in my_shell:-\n");
+	printf("cd [path...]\n");
+	printf("history [-c]\n");
+
+}
+
 // Returns the absolute path of current working directory
 char* pres_working_dir(){
 
@@ -422,10 +432,18 @@ int main( int argc, char const *argv[] ){
 
 			*/
 
-			// Exit form myshell
+			// Exit from myshell
 			if( strcmp( cmd, "exit" ) == 0 ){
 
 				return 0;
+
+			}
+
+
+			// Display help for all in-built commands
+			else if( strcmp( cmd, "help" ) == 0 ){
+
+				display_help();
 
 			}
 
