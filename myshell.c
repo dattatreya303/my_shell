@@ -5,10 +5,12 @@
 	* Implement 'clear'				DONE
 	* Handle erroneous commands		DONE
 	* Implement 'kill'				DONE
-	* Implement redirection 		DONE (only one level)
+	* Implement redirection 		DONE (only one operator, only system commands supported)
+	* Implement piping 				DONE (only one pipe, only system commands supported)
 	* Handle RETURN signal			PARTIAL
 	* Handle CTRL-C signal
-	* Implement piping
+
+	NB: Piping and redirection operators are handled separately, as of now. So, using them together is not supported.
 */
 
 /*
@@ -48,8 +50,8 @@ int RET_SIG;
 int CTRL_C_SIG;
 
 
-// Returns the tokens as a double pointer
-char** tokenize_string( char *cmd ){
+// Returns the arrray of tokens (separated by 'symbol') as a double pointer
+char** tokenize_string( char *cmd, char *symbol ){
 
 	char **tokens = ( char ** )malloc( CTOKS*sizeof(char*) );
 	char *str2, *subtoken;
@@ -58,7 +60,7 @@ char** tokenize_string( char *cmd ){
 	// strtok implementation from man page
 	for ( j = 0, str2 = cmd; ; str2 = NULL ) {
 
-		subtoken = strtok( str2, " " );
+		subtoken = strtok( str2, symbol );
 		if ( subtoken == NULL ){
 			break;
 		}
@@ -170,7 +172,13 @@ int check_redir( char *cmd, int *index ){
 
 }
 
-void prep_redirection( int redir_mode, int index, char *cmd ){
+/*
+	* Redirects STDIN or STDOUT to filename specified in cmd
+	* The filename is extracted from cmd using the index of redirection operator
+	* Streams are redirected according to redir_mode (1 - '>', 2 - '<')
+	* The path to file is trimmed of whitespace at the ends using strip_string().
+*/
+void prep_redirection( char *cmd, int index, int redir_mode ){
 
 	switch(redir_mode){
 		
@@ -179,7 +187,12 @@ void prep_redirection( int redir_mode, int index, char *cmd ){
 			char *filepath = cmd + index + 1;
 			filepath = strip_string( filepath, ' ' );
 			int fd_out = open( filepath, O_WRONLY|O_CREAT|O_TRUNC, S_IRUSR|S_IWUSR );
-			dup2( fd_out, STDOUT_FILENO );
+			if( dup2( fd_out, STDOUT_FILENO ) == -1 ){
+
+				printf("Failed to duplicate file descriptors!\n");
+
+			}
+			close(fd_out);
 			cmd[index] = '\0';
 			cmd = strip_string( cmd, ' ' );
 			break;
@@ -191,7 +204,12 @@ void prep_redirection( int redir_mode, int index, char *cmd ){
 			char *filepath = cmd + index + 1;
 			filepath = strip_string( filepath, ' ' );
 			int fd_in = open( filepath, O_RDONLY );
-			dup2( fd_in, STDIN_FILENO );
+			if( dup2( fd_in, STDIN_FILENO ) == -1 ){
+
+				printf("Failed to duplicate file descriptors!\n");
+				
+			}
+			close(fd_in);
 			cmd[index] = '\0';
 			cmd = strip_string( cmd, ' ' );
 			break;
@@ -200,6 +218,120 @@ void prep_redirection( int redir_mode, int index, char *cmd ){
 
 	}
 
+}
+
+char** prep_piping( char *cmd ){
+
+	char **arr = tokenize_string( cmd, "|" );
+	int i;
+	for( i = 0; arr[i] != NULL; i++ ){
+		arr[i] = strip_string( arr[i], ' ' );
+	}
+
+	return arr;
+
+}
+
+int exec_with_piping( char **commands ){
+
+	int noComs;
+	for( noComs = 0; commands[noComs] != NULL; noComs++ );
+	
+	int pipe_fds[2];
+	int pipe_fl = pipe(pipe_fds);
+	if( pipe_fl == -1 ){
+
+		printf("Failed to create pipe!\n");
+		return -1;
+
+	}
+
+	int pid_1 = fork();
+	if( pid_1 >= 0){
+
+		if( pid_1 == 0 ){
+
+			// Inside child process
+			
+			if( dup2( pipe_fds[0], STDIN_FILENO ) == -1 ){
+
+				printf("Failed to duplicate file descriptors\n");
+				return -1;
+
+			}
+
+			close(pipe_fds[0]);
+			close(pipe_fds[1]);
+
+			// Tokenize commands[1] into command and options
+			char **args = tokenize_string( commands[1], " " );
+
+			// Execute command with options
+			return execvp( args[0], args );
+
+		}
+	}
+
+	else{
+
+		printf("Failed to fork()!\n");
+		return -1;
+
+	}
+
+
+	int pid_0 = fork();
+	if( pid_0 >= 0){
+
+		if( pid_0 == 0 ){
+
+			// Inside child process 0
+			
+			if( dup2( pipe_fds[1], STDOUT_FILENO ) == -1 ){
+
+				printf("Failed to duplicate file descriptors\n");
+				return -1;
+
+			}
+
+			close(pipe_fds[0]);
+			close(pipe_fds[1]);
+
+			// Tokenize commands[0] into command and options
+			char **args = tokenize_string( commands[0], " " );
+
+			// Execute command with options
+			return execvp( args[0], args );
+
+		}
+	}
+
+	else{
+
+		printf("Failed to fork()!\n");
+		return -1;
+		
+	}
+
+	//  Close pipe as parent process does not need it anymore
+	close(pipe_fds[0]);
+	close(pipe_fds[1]);
+
+	// wait for all the children to terminate
+	int flag = 0;
+	int status;
+	while( wait(&status) > 0 ){
+
+		// Handle erroneous command
+		if( status == 65280 ){
+			
+			flag = -1;
+
+		}
+
+	}
+
+	return flag;
 }
 
 void print_cmd_history(){
@@ -226,7 +358,7 @@ void clear_cmd_history(){
 
 }
 
-void append_cmd_history(char* cmd){
+void append_cmd_history( char* cmd ){
 
 	FILE *fp = fopen( HIST_FILE, "a" );
 	fprintf(fp, "%s\n", cmd );
@@ -281,7 +413,7 @@ int main( int argc, char const *argv[] ){
 			else if( startswith( cmd, "cd" ) ){
 
 				// Extract path string from input
-				char **args = tokenize_string(cmd);
+				char **args = tokenize_string(cmd, " " );
 
 				if( args[1] != NULL ){
 
@@ -297,7 +429,7 @@ int main( int argc, char const *argv[] ){
 			*/
 			else if ( startswith( cmd, "history" ) ){
 
-				char **args = tokenize_string(cmd);
+				char **args = tokenize_string( cmd, " " );
 
 				if( args[1] == NULL ){
 
@@ -313,62 +445,97 @@ int main( int argc, char const *argv[] ){
 
 			} // 'history' handler
 
+			// Handle system commands
 			else{
 
-				int pid = fork();
-				
-				// fork() successful
-				if( pid >= 0 ){
+				/*
+					* Check for redirection operators (<, >, |)
+					* 0 - no redirection operators or pipes
+					* 1 - >
+					* 2 - <
+					* 3 - |
+				*/
+				int index = -1;
+				int redir_mode = check_redir(cmd, &index);
 
-					// Inside child process
-					if( pid == 0 ){
+				/*
+					Handle piped commands separately, as
+				 	we need to fork() multiple times.
+				 */
+				if( redir_mode == 3 ){
 
-						// printf("child process: %d\n", getpid());
+					// Create array of commands to be piped
+					char **commands = prep_piping(cmd);
+					// printf("%s %s\n", commands[0], commands[1]);
+					
+					// Handle commands in array with separate forks. 
+					int st = exec_with_piping(commands);
 
-						// Check for redirection operators (<, >, |)
-						int index = -1;
-						int redir_mode = check_redir(cmd, &index);
+					if( st < 0 ){
 
-						if( redir_mode == 1 || redir_mode == 2 ){
-
-							prep_redirection( redir_mode, index, cmd);
-
-						}
-
-						// Tokenize cmd into command and options
-						char **args = tokenize_string(cmd);
-						// printf("lalalala\n");
-						// Execute command with options
-						return execvp( args[0], args );
-
-					}
-
-					// Inside parent process
-					else{
-
-						int status;
-						
-						// Receives status code from child process here
-						wait(&status);
-
-						// Handle erroreous command
-						if( status == 65280 ){
-							
-							printf("%s: command not found\n", cmd);
-
-						}
+						printf("Something bad happened...\n");
 
 					}
 
 				}
 
+				// Handle '<', '>' or no redirection ( only one fork needed )
 				else{
 
-					perror("fork");
+					int pid = fork();
+					
+					// fork() successful
+					if( pid >= 0 ){
 
-				}
+						// Inside child process
+						if( pid == 0 ){
 
-			} // system command handler
+							// printf("child process: %d\n", getpid());
+
+							// Redirect I/O streams appropriately
+							switch(redir_mode){
+
+								case 1:
+								case 2:	prep_redirection( cmd, index, redir_mode ); break;
+
+							}
+
+							// Tokenize cmd into command and options
+							char **args = tokenize_string( cmd, " " );
+
+							// Execute command with options
+							return execvp( args[0], args );
+
+						}
+
+						// Inside parent process
+						else{
+
+							int status;
+							
+							// Receives status code from child process here
+							wait(&status);
+
+							// Handle erroneous command
+							if( status == 65280 ){
+								
+								printf("%s: command not found\n", cmd);
+
+							}
+
+						}
+
+					}
+
+					else{
+
+						perror("fork");
+
+					}
+					
+				} // Handle '<', '>' or no redirection ( only one fork needed )
+
+			} // handle system commands
 
 		} // if ( !RET_SIG )
 
