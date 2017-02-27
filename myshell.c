@@ -5,10 +5,10 @@
 	* Implement 'clear'				DONE
 	* Handle erroneous commands		DONE
 	* Implement 'kill'				DONE
+	* Implement redirection 		DONE (only one level)
 	* Handle RETURN signal			PARTIAL
 	* Handle CTRL-C signal
 	* Implement piping
-	* Implement redirection operators
 */
 
 /*
