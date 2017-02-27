@@ -232,6 +232,93 @@ void prep_redirection( char *cmd, int index, int redir_mode ){
 
 }
 
+/*
+void prep_redirection_mult( char *cmd, int index_in , int index_out, int redir_mode ){
+
+	switch(redir_mode){
+		
+		case 1:{
+
+			char *filepath = cmd + index_out + 1;
+			filepath = strip_string( filepath, ' ' );
+			int fd_out = open( filepath, O_WRONLY|O_CREAT|O_TRUNC, S_IRUSR|S_IWUSR );
+			if( dup2( fd_out, STDOUT_FILENO ) == -1 ){
+
+				printf("Failed to duplicate file descriptors!\n");
+
+			}
+			close(fd_out);
+			cmd[index] = '\0';
+			cmd = strip_string( cmd, ' ' );
+			break;
+
+		}
+
+		case 2:{
+
+			char *filepath = cmd + index_in + 1;
+			filepath = strip_string( filepath, ' ' );
+			int fd_in = open( filepath, O_RDONLY );
+			if( dup2( fd_in, STDIN_FILENO ) == -1 ){
+
+				printf("Failed to duplicate file descriptors!\n");
+				
+			}
+			close(fd_in);
+			cmd[index] = '\0';
+			cmd = strip_string( cmd, ' ' );
+			break;
+
+		}
+
+		case 4:{
+
+			char *cmd_only = (char *)malloc(sizeof(char)*CLEN);
+			int i;
+			for(i=0; (cmd[i] != '<' || cmd[i] != '>') && cmd[i] != '\0'; i++){
+				cmd_only[i] = cmd[i];
+			}
+			cmd_only[i] = '\0';
+			if(cmd[i] == '<' && cmd[i] != '\0'){
+				char *fileIn = (char *)malloc(sizeof(char)*CLEN);
+				int j;
+				for(j=i+1; cmd[j] != '>' && cmd[j] != '\0'; j++){
+					fileIn[j] = cmd[j];
+				}
+				fileIn[j] = '\0';
+				fileIn = strip_string(fileIn,' ');
+				int fd_in = open( fileIn, O_RDONLY );
+				if( dup2( fd_in, STDIN_FILENO ) == -1 ){
+
+					printf("Failed to duplicate file descriptors!\n");
+					
+				}
+				close(fd_in);
+			}
+			else if(cmd[i] == '>' && cmd[i] != '\0'){
+				char *fileOut = (char *)malloc(sizeof(char)*CLEN);
+				int j;
+				for(j=i+1; cmd[j] != '>' && cmd[j] != '\0'; j++){
+					fileOut[j] = cmd[j];
+				}
+				fileOut[j] = '\0';
+				fileOut = strip_string(fileOut,' ');
+				int fd_in = open( fileOut, O_RDONLY );
+				if( dup2( fd_in, STDIN_FILENO ) == -1 ){
+
+					printf("Failed to duplicate file descriptors!\n");
+					
+				}
+				close(fd_in);
+			}
+
+		}
+
+	}
+
+}
+*/
+
 char** prep_piping( char *cmd ){
 
 	char **arr = tokenize_string( cmd, "|" );
