@@ -33,6 +33,9 @@
 // Name of file keeping record of user commands issued
 #define HIST_FILE "/home/dattatreya/.history"
 
+// Home directory; default 'cd' action
+#define HOME "/home/dattatreya"
+
 // Maximum characters in a path
 #define PLEN 100
 
@@ -655,6 +658,13 @@ int main( int argc, char const *argv[] ){
 				if( args[1] != NULL ){
 
 					change_dir(args[1]);
+
+				}
+
+				// Change to home directory in case no argument passed after 'cd'
+				else{
+
+					change_dir(HOME);
 
 				}
 
